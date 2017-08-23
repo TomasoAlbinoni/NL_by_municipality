@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" type="text/css" href="css/styles.css">
+  <script src="d3.v3.min.js"></script>
+  <script type="text/javascript">  
+    function draw(geo_data) {
+    
+      "use strict";
+      
+      // Remove water portions of municipalities
+      geo_data.features = geo_data.features.filter(function(d) {
+        return d.properties['WATER'] === "NEE";
+      });
+      
+      // Add features GENDER_BALANCE and TOP_AGE_GROUP
+      for (var i in geo_data.features) {
+        // Number of men / number of inhabitants
+        geo_data.features[i].properties['GENDER_BALANCE'] = 
+          geo_data.features[i].properties['AANT_MAN'] /
+          geo_data.features[i].properties['AANT_INW'];
+        // Top age group
+        var age_groups = { 'P_00_14_JR': geo_data.features[i].properties['P_00_14_JR'],
+                           'P_15_24_JR': geo_data.features[i].properties['P_15_24_JR'],
+                           'P_25_44_JR': geo_data.features[i].properties['P_25_44_JR'],
+                           'P_45_64_JR': geo_data.features[i].properties['P_45_64_JR'],
+                           'P_65_EO_JR': geo_data.features[i].properties['P_65_EO_JR']
+                         };
+        geo_data.features[i].properties['TOP_AGE_GROUP'] = Object.keys(age_groups).reduce(function(a, b) {
+          return age_groups[a] > age_groups[b] ? a : b;
+        });
+      }
+      
+      function get_extent(data, key) {
+        return d3.extent(data, function(d) {
+          return d.properties[key];
+        });
+      }
+      
+      function insert_middle(arr) {
+        arr.splice(1, 0, (arr[0] + arr[1]) / 2);
+        return arr;
+      }
+      
+      function create_series(len, fun) {
+        return Array.apply(0, Array(len)).map(fun);
+      }
+      
+      var age_groups_pretty = {
+        'P_00_14_JR': "0-14",
+        'P_15_24_JR': "15-24",
+        'P_25_44_JR': "25-44",
+        'P_45_64_JR': "45-64",
+        'P_65_EO_JR': "65 and over"
+      };
+
+      var statistics = [
+        {
+          "display": false,
+          "key": "AANT_INW",
+          "text": "Number of Inhabitants",
+          "color_scale": d3.scale.linear()
+                        .domain(get_extent(geo_data.features, 'AANT_INW'))
+                        .range(["white","darkRed"]),
+          "legend_domain": create_series(8, function(_, b) { return 100000 + b * 100000; }),
+          "legend_labels": create_series(8, function(_, b) { return 100000 + b * 100000 + ' inhabitants'; }),
+          "tooltip_line": function(d) {
+            return 'Number of Inhabitants: ' + d.properties['AANT_INW'].toLocaleString() + '<br>';
+          }
+        }, {
+          "display": true,
+          "key": "BEV_DICHTH",
+          "text": "Population Density",
+          "color_scale": d3.scale.linear()
+                        .domain(get_extent(geo_data.features, 'BEV_DICHTH'))
+                        .range(["lightBlue", "#ef3d47"]),
+          "legend_domain": create_series(7, function(_, b) { return b * 1000; }),
+          "legend_labels": create_series(7, function(_, b) { return b * 1000 + ' inh. / square km'; }),
+          "tooltip_line": function(d) {
+            return d.properties['AANT_INW'].toLocaleString() + ' inhabitants ' +
+            '(' + d.properties['BEV_DICHTH'].toLocaleString() + ' / km<sup>2</sup>)<br>';
+          }
+        }, {
+          "display": true,
+          "key": "TOP_AGE_GROUP",
+          "text": "Top Age Group",
+          "color_scale": d3.scale.ordinal()
+                        .domain(['P_00_14_JR', 'P_15_24_JR', 'P_25_44_JR', 'P_45_64_JR', 'P_65_EO_JR'])
+                        .range(["lightGreen", "yellow", "orange", "brown", "gray"]),
+          "legend_domain": ['P_00_14_JR', 'P_15_24_JR', 'P_25_44_JR', 'P_45_64_JR', 'P_65_EO_JR'],
+          "legend_labels": ["0-14", "15-24", "25-44", "45-64", "65 and over"],
+          "tooltip_line": function(d) {
+            var top_age_group = d.properties['TOP_AGE_GROUP'];
+            return 'Top age group: ' + age_groups_pretty[top_age_group] +
+              ' (' + d.properties[top_age_group] + '%)<br>';
+          }
+        }, {
+          "display": false,
+          "key": "GENDER_BALANCE",
+          "text": "Gender Distribution",
+          "color_scale": d3.scale.linear()
+                        .domain([0.45, 0.5, 0.55])
+                        .range(["red", "white", "blue"]),
+          "legend_domain": create_series(11, function(_, b) { return 0.45 + b * 0.01; }),
+          "legend_labels": create_series(11, function(_, b) {
+            var men = 45 + b;
+            var women = 100 - men;
+            return men +'% men – ' + women + '% women';
+          }),
+          "tooltip_line": function(d) {
+            var percent_men = (d.properties['GENDER_BALANCE'] * 100).toFixed(1) + "%";
+            var percent_women = (100 - d.properties['GENDER_BALANCE'] * 100).toFixed(1) + "%";
+            return percent_men + ' men &ndash; ' + percent_women + ' women<br>';
+          }
+        }, {
+          "display": true,
+          "key": "P_ONGEHUWD",
+          "text": "% Unmarried Inhabitants",
+          "color_scale": d3.scale.linear()
+                        .domain(get_extent(geo_data.features, 'P_ONGEHUWD'))
+                        .range(["lightBlue", "#ef3d47"]),
+          "legend_domain": create_series(7, function(_, b) { return 36 + b * 5; }),
+          "legend_labels": create_series(7, function(_, b) { return (36 + b * 5) + '%'; }),
+          "tooltip_line": function(d) {
+            return 'Unmarried inhabitants: ' + d.properties['P_ONGEHUWD'] + '%<br>';
+          }
+        }, {
+          "display": false,
+          "key": "P_N_W_AL",
+          "text": "% Non-western Immigrants",
+          "color_scale": d3.scale.linear()
+                        .domain(get_extent(geo_data.features, 'P_N_W_AL'))
+                        .range(["white", "#145214"]),
+          "legend_domain": create_series(4, function(_, b) { return b * 10; }),
+          "legend_labels": create_series(4, function(_, b) { return b * 10 + '%'; }),
+          "tooltip_line": function(d) {
+            return 'Non-western immigrants: ' + d.properties['P_N_W_AL'] + '%<br>';
+          }
+        }, {
+          "display": false,
+          "key": "P_HH_Z_K",
+          "text": "% Households Without Children",
+          "color_scale": d3.scale.linear()
+                        .domain(get_extent(geo_data.features, 'P_HH_Z_K'))
+                        .range(["lightBlue", "#ef3d47"]),
+          "legend_domain": create_series(8, function(_, b) { return 21 + b * 3; }),
+          "legend_labels": create_series(8, function(_, b) { return (21 + b * 3) + '%'; }),
+          "tooltip_line": function(d) {
+            return 'Households without children: ' + d.properties['P_HH_Z_K'] + '%<br>';
+          }
+        }, {
+          "display": false,
+          "key": "P_GESCHEID",
+          "text": "% Divorced Inhabitants",
+          "color_scale": d3.scale.linear()
+                        .domain(insert_middle(get_extent(geo_data.features, 'P_GESCHEID')))
+                        .range(["lightGreen", "lightBlue", "#ef3d47"]),
+          "legend_domain": create_series(6, function(_, b) { return 2 + b * 2; }),
+          "legend_labels": create_series(6, function(_, b) { return (2 + b * 2) + '%'; }),
+          "tooltip_line": function(d) {
+            return 'Divorded inhabitants: ' + d.properties['P_GESCHEID'] + '%<br>';
+          }
+        }, {
+          "display": false,
+          "key": "P_VERWEDUW",
+          "text": "% Widows/Widowers",
+          "color_scale": d3.scale.linear()
+                        .domain(get_extent(geo_data.features, 'P_VERWEDUW'))
+                        .range(["lightBlue", "#ef3d47"]),
+          "legend_domain": create_series(4, function(_, b) { return 3 + b * 2; }),
+          "legend_labels": create_series(4, function(_, b) { return (3 + b * 2) + '%'; }),
+          "tooltip_line": function(d) {
+            return 'Widows/widowers: ' + d.properties['P_VERWEDUW'] + '%<br>';
+          }
+        }, {
+          "display": false,
+          "key": "P_GEBOO",
+          "text": "Births per 1000 Inhabitants",
+          "color_scale": d3.scale.linear()
+                        .domain(insert_middle(get_extent(geo_data.features, 'P_GEBOO')))
+                        .range(["lightGreen", "lightBlue", "#ef3d47"]),
+          "legend_domain": create_series(6, function(_, b) { return 3 + b * 3; }),
+          "legend_labels": create_series(6, function(_, b) { return (3 + b * 3); }),
+          "tooltip_line": function(d) {
+            return 'Births per 1000 inhabitants: ' + d.properties['P_GEBOO'] + '<br>';
+          }
+        }, {
+          "display": true,
+          "key": "P_EENP_HH",
+          "text": "% One-person Households",
+          "color_scale": d3.scale.linear()
+                        .domain(get_extent(geo_data.features, 'P_EENP_HH'))
+                        .range(["lightBlue", "#ef3d47"]),
+          "legend_domain": create_series(8, function(_, b) { return 19 + b * 6; }),
+          "legend_labels": create_series(8, function(_, b) { return (19 + b * 6) + '%'; }),
+          "tooltip_line": function(d) {
+            return 'One-person households: ' + d.properties['P_EENP_HH'] + '%<br>';
+          }
+        }, {
+          "display": true,
+          "key": "GEM_HH_GR",
+          "text": "Average Household Size",
+          "color_scale": d3.scale.linear()
+                        .domain(get_extent(geo_data.features, 'GEM_HH_GR'))
+                        .range(["lightBlue", "#ef3d47"]),
+          "legend_domain": create_series(5, function(_, b) { return 1.6 + b * 0.4; }),
+          "legend_labels": create_series(5, function(_, b) { return (1.6 + b * 0.4).toFixed(1) + " persons"; }),
+          "tooltip_line": function(d) {
+            return 'Average household size: ' + d.properties['GEM_HH_GR'].toFixed(1) + '<br>';
+          }
+        }
+      ];
+
+      var width = 1000,
+          height = 800;
+
+      var svg = d3.select("body")
+                  .append("svg")
+                  .attr("width", width)
+                  .attr("height", height)
+                  .append('g')
+                  .attr('class', 'map');
+          
+      // Set background color
+      svg.append("rect")
+         .attr("width", "100%")
+         .attr("height", "100%")
+         .attr("fill", "#ddd");
+      
+      var projection = d3.geo.mercator()
+                             .scale(9000)
+                             .translate([-430, 10064]);
+
+      var path = d3.geo.path().projection(projection);
+      
+      function tooltip_html(d) {
+        var tt_html = '<strong>' + d.properties['GM_NAAM'] + '</strong><br>' +
+        'Land area: ' + d.properties['OPP_LAND'].toLocaleString() + ' ha<br>';
+        for (i in statistics) {
+          if (statistics[i].display) {
+            tt_html += statistics[i].tooltip_line(d);
+          }
+        }
+        return tt_html;
+      }
+      
+      function show_tooltip(d) {
+        d3.select("div.tooltip")
+          .html(tooltip_html(d))
+          .style("opacity", 1)
+          .style("top", (d3.event.pageY - 120)+"px")
+          .style("left",(d3.event.pageX - 210)+"px");
+        d3.select(this)
+          .style('stroke-width', 2);
+      }
+      
+      function hide_tooltip(d) {
+        d3.select("div.tooltip")
+          .style("opacity", 0);
+        d3.select(this)
+          .style('stroke-width', 1);
+      }
+      
+      // Draw map
+      var map = svg.selectAll('path')
+                   .data(geo_data.features)
+                   .enter()
+                   .append('path')
+                   .attr('d', path)
+                   .style('fill', 'white')
+                   .style('stroke', 'black')
+                   .style('stroke-width', 1)
+                   .on("mouseover", show_tooltip)
+                   .on("mouseout", hide_tooltip);
+
+      // Create legends
+      var legend;
+      for (var i in statistics) {
+
+        if (!statistics[i].display) {
+          continue;
+        }
+        
+        legend = svg.append("g")
+                    .attr("class", "legend " + statistics[i].key)
+                    // Adding .5 makes rectangle display crisp
+                    .attr("transform", "translate(" + (width - 250.5) + "," + 50.5 + ")")
+                    .style("opacity", 0)
+                    .selectAll("g")
+                    .data(statistics[i].legend_domain)
+                    .enter()
+                    .append("g");
+
+        legend.append("rect")
+              .attr("width", 30)
+              .attr("height", 20)
+              .attr("y", function(d, i) {
+                return i * 30;
+              })
+              .style('stroke', 'black')
+              .style('stroke-width', 1)
+              .style("fill", function(d) {
+                return statistics[i].color_scale(d);
+              });
+
+        legend.append("text")
+              .attr("y", function(d, i) {
+                return i * 30 + 15;
+              })
+              .attr("x", 45)
+              .attr("text-anchor", "start")
+              .text(function(d, j) {
+                return statistics[i].legend_labels[j];
+              });
+      }
+
+      // Add buttons for displaying different statistics
+      var buttons = d3.select("div.select_statistics")
+                      .selectAll("div")
+                      .data(statistics.filter(function(d) {
+                        return d.display;
+                      }))
+                      .enter()
+                      .append("div")
+                      .text(function(d) {
+                          return d['text'];
+                      });
+      
+      buttons.on("click", function(d) {
+        // Restore default button appearance for all buttons
+        d3.select("div.select_statistics")
+          .selectAll("div")
+          .style("background", "#f9b57b");
+
+        // Style active button
+        d3.select(this)
+          .style("background", "#75bcde")
+        
+        // Change subheader
+        d3.select("h2")
+          .text(d['text']);
+        
+        // Change fill color of municipalities based on selected statistic
+        svg.selectAll('path')
+          .each(function(dd) {
+            d3.select(this).style('fill', function(dd) {
+              return d.color_scale(dd.properties[d.key]);
+            });
+          });
+
+        // Hide all legends and then show the right one
+        d3.selectAll("g.legend").style("opacity", 0);
+        d3.select("g." + d.key).style("opacity", 1);
+      });
+    };
+
+    window.onload = function() {
+      d3.json("Netherlands_2015_simplified.json", draw);
+    }
+  </script>
+</head>
+<body>
+  <h1>The Netherlands by Municipality (2015)</h1>
+  <h2>Click one of the buttons on the left to visualize a metric</h2>
+  <div class="tooltip"></div>
+  <div class="select_statistics"></div>
+</body>
+</html>
