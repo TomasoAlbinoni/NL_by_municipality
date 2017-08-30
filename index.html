@@ -203,9 +203,9 @@
           "text": "Average Household Size",
           "color_scale": d3.scale.linear()
                         .domain(get_extent(geo_data.features, 'GEM_HH_GR'))
-                        .range(["lightBlue", "#ef3d47"]),
-          "legend_domain": create_series(5, function(_, b) { return 1.6 + b * 0.4; }),
-          "legend_labels": create_series(5, function(_, b) { return (1.6 + b * 0.4).toFixed(1) + " persons"; }),
+                        .range(["#ff8", "#33b"]),
+          "legend_domain": create_series(9, function(_, b) { return 1.6 + b * 0.2; }),
+          "legend_labels": create_series(9, function(_, b) { return (1.6 + b * 0.2).toFixed(1) + " persons"; }),
           "tooltip_line": function(d) {
             return 'Average household size: ' + d.properties['GEM_HH_GR'].toFixed(1) + '<br>';
           }
@@ -353,7 +353,7 @@
         d3.selectAll("g.legend").style("opacity", 0);
         d3.select("g." + d.key).style("opacity", 1);
       });
-    };
+    }
 
     window.onload = function() {
       d3.json("Netherlands_2015_simplified.json", draw);
@@ -365,5 +365,6 @@
   <h2>Click one of the buttons on the left to visualize a metric</h2>
   <div class="tooltip"></div>
   <div class="select_statistics"></div>
+  <div id="attribution">Data source: <a target="_blank" href="https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische%20data/wijk-en-buurtkaart-2015">CBS</a></div>
 </body>
 </html>

@@ -37,3 +37,11 @@ div.select_statistics div {
 div.select_statistics div:hover {
   border-color: white;
 }
+div#attribution {
+  position: absolute;
+  top: 900px;
+  left: calc(50% + 350px);
+}
+div#attribution a {
+	color: black;
+}
